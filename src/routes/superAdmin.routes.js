@@ -13,6 +13,7 @@ router.get('/dashboard', superAdminController.getDashboardStats);
 
 // Users Management
 router.get('/users', superAdminController.getUsers);
+router.get('/users/export', superAdminController.exportUsers);
 router.get('/users/:id', superAdminController.getUserDetails);
 router.put('/users/:id/status', superAdminController.updateUserStatus);
 router.put('/users/:id/role', superAdminController.updateUserRole);

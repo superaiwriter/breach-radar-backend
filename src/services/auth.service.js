@@ -85,12 +85,12 @@ const registerUser = async ({ email, password, name }) => {
       <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
           <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
-          <span style="font-size:20px;font-weight:900;color:#ffffff">Breach Radar</span>
+          <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
         </div>
         <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">Verify Your Email Address</h1>
         <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6">
           Hi <strong style="color:#ffffff">${name}</strong>,<br><br>
-          Thank you for creating your Breach Radar account! Please verify your email to activate it.
+          Thank you for creating your PentestRadar account! Please verify your email to activate it.
         </p>
         <div style="background:#091421;border:1px solid #20324a;border-radius:10px;padding:18px;margin-bottom:22px">
           <p style="margin:0 0 8px;color:#aeb8c7;font-size:13px">Account Email</p>
@@ -112,7 +112,7 @@ const registerUser = async ({ email, password, name }) => {
 
   sendEmail({
     to: email,
-    subject: 'Breach Radar — Verify Your Email Address',
+    subject: 'PentestRadar — Verify Your Email Address',
     html,
     text: `Verify your email: ${verifyUrl}\n\nExpires in 24 hours.`
   }).catch((err) => {
@@ -457,7 +457,7 @@ const verifyEmail = async ({ token, email }) => {
   await user.save();
 
   // Send welcome email now that they verified
-  sendWelcomeEmail({ to: user.email, name: user.profile.name }).catch(() => {});
+  sendWelcomeEmail({ to: user.email, name: user.profile.name }).catch(() => { });
 
   logger.info(`[verify-email] Email verified: ${email}`);
 
@@ -494,7 +494,7 @@ const resendVerificationEmail = async ({ email }) => {
       <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
           <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
-          <span style="font-size:20px;font-weight:900;color:#ffffff">Breach Radar</span>
+          <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
         </div>
         <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">New Verification Link</h1>
         <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6">
@@ -513,7 +513,7 @@ const resendVerificationEmail = async ({ email }) => {
 
   await sendEmail({
     to: email,
-    subject: 'Breach Radar — New Verification Link',
+    subject: 'PentestRadar — New Verification Link',
     html,
     text: `New verification link: ${verifyUrl}`
   });

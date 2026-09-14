@@ -225,6 +225,140 @@ const getUsers = async (req, res, next) => {
   }
 };
 
+const exportUsers = async (req, res, next) => {
+  try {
+    const { format } = req.query;
+    
+    // Default format to csv if not provided or invalid
+    const allowedFormats = ['csv', 'xlsx', 'json'];
+    const exportFormat = allowedFormats.includes(format) ? format : 'csv';
+
+    // Stream/fetch all users using cursor to handle large datasets safely
+    const cursor = User.find({}).sort({ createdAt: -1 }).cursor();
+    
+    const rows = [];
+    let doc;
+    while ((doc = await cursor.next())) {
+      const user = doc;
+      
+      // Fetch user's workspace
+      const workspace = await Workspace.findOne({ owner: user._id });
+      
+      // Fetch domains related to the workspace
+      let domainNames = '';
+      let domainCount = 0;
+      if (workspace) {
+        const domains = await Domain.find({ workspaceId: workspace._id });
+        domainNames = domains.map(d => d.domain).join(', ');
+        domainCount = domains.length;
+      }
+      
+      // Fetch scans count related to the workspace
+      let scanCount = 0;
+      if (workspace) {
+        scanCount = await Scan.countDocuments({ workspaceId: workspace._id });
+      }
+      
+      // Fetch subscription details
+      const subscription = await Subscription.findOne({ userId: user._id });
+      
+      // Fetch payment transactions
+      const payments = await PaymentTransaction.find({ userId: user._id });
+      const totalPaid = payments.reduce((acc, p) => p.status === 'succeeded' ? acc + p.amount : acc, 0);
+      const totalRefunded = payments.reduce((acc, p) => p.status === 'refunded' ? acc + p.amount : acc, 0);
+      const paymentHistory = payments
+        .map(p => `${p.transactionId}: ${p.status} (${p.amount} ${p.currency})`)
+        .join('; ');
+
+      // Build safe row object (never export passwords or security keys!)
+      const row = {
+        'User ID': user._id.toString(),
+        'Name': user.profile?.name || '',
+        'Email': user.email,
+        'Role': user.role,
+        'Status': user.status,
+        'Plan': user.profile?.plan || 'Starter',
+        'Email Verified': user.isEmailVerified ? 'Yes' : 'No',
+        'Last Login': user.lastLogin ? user.lastLogin.toISOString() : '',
+        'MFA Enabled': user.security?.mfaEnabled ? 'Yes' : 'No',
+        'Language': user.preferences?.language || 'en',
+        'Timezone': user.preferences?.timezone || 'UTC',
+        'Phone Number': user.profile?.phoneNumber || '',
+        'Organization': user.profile?.organization || '',
+        'Job Title': user.profile?.jobTitle || '',
+        'Country': user.profile?.country || '',
+        'Workspace ID': workspace ? workspace._id.toString() : '',
+        'Workspace Name': workspace ? workspace.name : '',
+        'Domain Count': domainCount,
+        'Domains': domainNames,
+        'Scan Count': scanCount,
+        'Subscription Plan': subscription ? subscription.currentPlan : '',
+        'Subscription Status': subscription ? subscription.status : '',
+        'Subscription Payment Status': subscription ? subscription.paymentStatus : '',
+        'Subscription Start': subscription && subscription.startDate ? subscription.startDate.toISOString() : '',
+        'Subscription Expiry': subscription && subscription.expiryDate ? subscription.expiryDate.toISOString() : '',
+        'Subscription Next Billing': subscription && subscription.nextBillingDate ? subscription.nextBillingDate.toISOString() : '',
+        'Total Paid (INR)': totalPaid,
+        'Total Refunded (INR)': totalRefunded,
+        'Payment Transactions': paymentHistory,
+        'Created At': user.createdAt ? user.createdAt.toISOString() : '',
+        'Updated At': user.updatedAt ? user.updatedAt.toISOString() : ''
+      };
+      
+      rows.push(row);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (exportFormat === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename=users-export-${todayStr}.json`);
+      return res.status(200).send(JSON.stringify(rows, null, 2));
+    }
+
+    if (exportFormat === 'xlsx') {
+      const XLSX = require('xlsx');
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=users-export-${todayStr}.xlsx`);
+      return res.status(200).send(buffer);
+    }
+
+    // Default: CSV format
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=users-export-${todayStr}.csv`);
+    
+    if (rows.length === 0) {
+      return res.status(200).send('');
+    }
+
+    const headers = Object.keys(rows[0]);
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return '';
+      let str = String(val);
+      str = str.replace(/"/g, '""');
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str}"`;
+      }
+      return str;
+    };
+
+    let csvContent = headers.join(',') + '\n';
+    for (const r of rows) {
+      csvContent += headers.map(h => escapeCSV(r[h])).join(',') + '\n';
+    }
+    
+    return res.status(200).send(csvContent);
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getUserDetails = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id).select('-passwordHash');
@@ -961,6 +1095,7 @@ const updateCustomerSubscriptionStatus = async (req, res, next) => {
 module.exports = {
   getDashboardStats,
   getUsers,
+  exportUsers,
   getUserDetails,
   updateUserStatus,
   updateUserRole,

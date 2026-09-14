@@ -37,6 +37,9 @@ function buildDefaultChecks(scanType, checks = {}) {
     ports: scanType === SCAN_TYPES.FULL || scanType === SCAN_TYPES.CUSTOM,
     malware: true,
     compliance: scanType === SCAN_TYPES.FULL,
+    businessLogic: true,
+    apiSecurity: true,
+    cloudInfrastructure: true,
     ...checks
   };
 }

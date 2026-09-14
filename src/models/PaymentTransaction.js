@@ -23,7 +23,7 @@ const PaymentTransactionSchema = new mongoose.Schema({
   },
   provider: {
     type: String,
-    enum: ['manual', 'razorpay', 'stripe'],
+    enum: ['manual', 'razorpay', 'stripe', 'paypal'],
     default: 'manual',
     index: true,
   },

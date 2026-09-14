@@ -26,7 +26,7 @@ function startMonitoringScheduler() {
   }
 
   started = true;
-  logger.info('Starting Breach Radar monitoring scheduler');
+  logger.info('Starting PentestRadar monitoring scheduler');
 
   cron.schedule(DAILY_SCAN_CRON, async () => {
     logger.info('Cron triggered: daily domain scans');

@@ -83,7 +83,7 @@ const dbSeeder = async () => {
     logger.info('Subscription plans seeded/updated successfully.');
 
     // 2. Seed Super Admin User
-    const superAdminEmail = 'superadmin@breachradar.com';
+    const superAdminEmail = 'superadmin@pentestradar.com';
     let superAdmin = await User.findOne({ email: superAdminEmail });
     if (!superAdmin) {
       logger.info(`Creating default Super Admin user (${superAdminEmail})...`);
@@ -115,11 +115,11 @@ const dbSeeder = async () => {
       superAdmin.preferences.activeWorkspaceId = workspace._id;
       await superAdmin.save();
 
-      logger.info('Super Admin user created successfully. User: superadmin@breachradar.com / Password123!');
+      logger.info('Super Admin user created successfully. User: superadmin@pentestradar.com / Password123!');
     }
 
     // 3. Seed Normal Test User & their Subscription Architecture
-    const testUserEmail = 'user@breachradar.com';
+    const testUserEmail = 'user@pentestradar.com';
     let testUser = await User.findOne({ email: testUserEmail });
     if (!testUser) {
       logger.info(`Creating default test user (${testUserEmail})...`);
@@ -356,6 +356,76 @@ const dbSeeder = async () => {
           status: 'Success'
         }
       ]);
+    }
+
+    // 7. Seed Domain and AuthProfiles for BOLA local test
+    const bolaDomainName = 'localhost:5000';
+    const Domain = require('../models/Domain');
+    const AuthProfile = require('../models/AuthProfile');
+    const { encryptSecret } = require('../utils/authProfileCrypto');
+
+    let bolaDomain = await Domain.findOne({ workspaceId: testWorkspace._id, domain: bolaDomainName });
+    if (!bolaDomain) {
+      bolaDomain = await Domain.create({
+        workspaceId: testWorkspace._id,
+        domain: bolaDomainName,
+        status: 'Active',
+        statusDetail: 'Configured for BOLA local scanning',
+        verificationStatus: 'verified',
+        verifiedAt: new Date()
+      });
+      logger.info('Seeded local domain localhost:5000');
+    }
+
+    // Seed Profile for User A
+    const profileA = await AuthProfile.findOne({ workspaceId: testWorkspace._id, domainId: bolaDomain._id, username: 'usera@securescan.local' });
+    if (!profileA) {
+      await AuthProfile.create({
+        workspaceId: testWorkspace._id,
+        domainId: bolaDomain._id,
+        label: 'BOLA User A Profile',
+        authType: 'credentials',
+        username: 'usera@securescan.local',
+        passwordEncrypted: encryptSecret('Password123!'),
+        loginUrl: '/api/v1/test-bola/login-page',
+        createdBy: testUser._id,
+        oneTimeUse: false
+      });
+      logger.info('Seeded BOLA User A AuthProfile');
+    }
+
+    // Seed Profile for User B
+    const profileB = await AuthProfile.findOne({ workspaceId: testWorkspace._id, domainId: bolaDomain._id, username: 'userb@securescan.local' });
+    if (!profileB) {
+      await AuthProfile.create({
+        workspaceId: testWorkspace._id,
+        domainId: bolaDomain._id,
+        label: 'BOLA User B Profile',
+        authType: 'credentials',
+        username: 'userb@securescan.local',
+        passwordEncrypted: encryptSecret('Password123!'),
+        loginUrl: '/api/v1/test-bola/login-page',
+        createdBy: testUser._id,
+        oneTimeUse: false
+      });
+      logger.info('Seeded BOLA User B AuthProfile');
+    }
+
+    // Seed Profile for Admin (BFLA testing)
+    const profileAdmin = await AuthProfile.findOne({ workspaceId: testWorkspace._id, domainId: bolaDomain._id, username: 'admin@securescan.local' });
+    if (!profileAdmin) {
+      await AuthProfile.create({
+        workspaceId: testWorkspace._id,
+        domainId: bolaDomain._id,
+        label: 'BFLA Admin Profile',
+        authType: 'credentials',
+        username: 'admin@securescan.local',
+        passwordEncrypted: encryptSecret('Password123!'),
+        loginUrl: '/api/v1/test-bfla/login-page',
+        createdBy: testUser._id,
+        oneTimeUse: false
+      });
+      logger.info('Seeded BFLA Admin AuthProfile');
     }
 
     logger.info('Database seeder finished checking/seeding.');

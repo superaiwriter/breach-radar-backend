@@ -31,6 +31,17 @@ const validateDomainFormat = (domain) => {
 const validatePublicDomainTarget = (domain) => {
   const normalizedDomain = normalizeDomainName(domain);
 
+  if (process.env.NODE_ENV === 'development') {
+    const isLocalhost = normalizedDomain === 'localhost' || normalizedDomain.startsWith('localhost:');
+    const isLocalIp = normalizedDomain === '127.0.0.1' || normalizedDomain.startsWith('127.0.0.1:');
+    if (isLocalhost || isLocalIp) {
+      return {
+        valid: true,
+        domain: normalizedDomain
+      };
+    }
+  }
+
   if (!validateDomainFormat(normalizedDomain)) {
     return {
       valid: false,

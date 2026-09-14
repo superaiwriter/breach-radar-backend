@@ -11,6 +11,7 @@ const oauthRoutes = require('./routes/oauth.routes');
 const authRoutes = require('./routes/auth.routes');
 const domainRoutes = require('./routes/domain.routes');
 const scanRoutes = require('./routes/scan.routes');
+const authProfileRoutes = require('./routes/authProfile.routes');
 const vulnRoutes = require('./routes/vuln.routes');
 const reportRoutes = require('./routes/report.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
@@ -29,6 +30,38 @@ const apiAccessRoutes = require('./routes/apiAccess.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const activityLogRoutes = require('./routes/activityLog.routes');
 const supportRoutes = require('./routes/support.routes');
+const statsRoutes = require('./routes/stats.routes');
+const testBusinessWorkflowRoutes = require('./routes/testBusinessWorkflow.routes');
+const testBolaWorkflowRoutes = require('./routes/testBolaWorkflow.routes');
+const testBflaWorkflowRoutes = require('./routes/testBflaWorkflow.routes');
+const testExposureWorkflowRoutes = require('./routes/testExposureWorkflow.routes');
+const testMassAssignmentWorkflowRoutes = require('./routes/testMassAssignmentWorkflow.routes');
+const testRateLimitWorkflowRoutes = require('./routes/testRateLimitWorkflow.routes');
+const testAdminExposureRoutes = require('./routes/testAdminExposure.routes');
+const testCloudStorageRoutes = require('./routes/testCloudStorage.routes');
+const testMisconfigWorkflowRoutes = require('./routes/testMisconfigWorkflow.routes');
+const testDefaultCredsWorkflowRoutes = require('./routes/testDefaultCredsWorkflow.routes');
+const testSensitiveDisclosureWorkflowRoutes = require('./routes/testSensitiveDisclosureWorkflow.routes');
+const testFileUploadWorkflowRoutes = require('./routes/testFileUploadWorkflow.routes');
+const testPathTraversalWorkflowRoutes = require('./routes/testPathTraversalWorkflow.routes');
+const testInsecureFileDownloadWorkflowRoutes = require('./routes/testInsecureFileDownloadWorkflow.routes');
+const testSqlInjectionWorkflowRoutes = require('./routes/testSqlInjectionWorkflow.routes');
+const testNoSqlInjectionWorkflowRoutes = require('./routes/testNoSqlInjectionWorkflow.routes');
+const testCommandInjectionWorkflowRoutes = require('./routes/testCommandInjectionWorkflow.routes');
+const testSstiWorkflowRoutes = require('./routes/testSstiWorkflow.routes');
+const testXxeWorkflowRoutes = require('./routes/testXxeWorkflow.routes');
+const testXssWorkflowRoutes = require('./routes/testXssWorkflow.routes');
+const testCsrfWorkflowRoutes = require('./routes/testCsrfWorkflow.routes');
+const testOpenRedirectWorkflowRoutes = require('./routes/testOpenRedirectWorkflow.routes');
+const testSsrfWorkflowRoutes = require('./routes/testSsrfWorkflow.routes');
+const testHostHeaderWorkflowRoutes = require('./routes/testHostHeaderWorkflow.routes');
+const testHttpRequestSmugglingWorkflowRoutes = require('./routes/testHttpRequestSmugglingWorkflow.routes');
+const testDirectoryListingRoutes = require('./routes/testDirectoryListing.routes');
+const testBackupFileExposureRoutes = require('./routes/testBackupFileExposure.routes');
+const testGitExposureRoutes = require('./routes/testGitExposure.routes');
+const testDebugModeRoutes = require('./routes/testDebugMode.routes');
+
+
 
 
 const { generalLimiter } = require('./middleware/rateLimiter');
@@ -40,8 +73,10 @@ const app = express();
 const defaultCorsOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:5180',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174'
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5180'
 ];
 
 const corsOrigins = [
@@ -108,6 +143,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/auth', oauthRoutes); // Google OAuth routes
 app.use('/api/v1/domains', domainRoutes);
 app.use('/api/v1/scans', scanRoutes);
+app.use('/api/v1/auth-profiles', authProfileRoutes);
 app.use('/api/v1/vulnerabilities', vulnRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
@@ -127,6 +163,39 @@ app.use('/api/v1/api-access', apiAccessRoutes);
 app.use('/api/v1/integrations', integrationRoutes);
 app.use('/api/v1/activity-log', activityLogRoutes);
 app.use('/api/v1/support', supportRoutes);
+app.use('/api/v1/stats', statsRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/v1/test-business-workflow', testBusinessWorkflowRoutes);
+app.use('/api/v1/test-bola', testBolaWorkflowRoutes);
+app.use('/api/v1/test-bfla', testBflaWorkflowRoutes);
+app.use('/api/v1/test-exposure', testExposureWorkflowRoutes);
+app.use('/api/v1/test-mass-assignment', testMassAssignmentWorkflowRoutes);
+app.use('/api/v1/test-ratelimit', testRateLimitWorkflowRoutes);
+app.use('/api/v1/test-admin-exposure', testAdminExposureRoutes);
+app.use('/api/v1/test-cloud-storage', testCloudStorageRoutes);
+app.use('/api/v1/test-misconfig', testMisconfigWorkflowRoutes);
+app.use('/api/v1/test-default-creds', testDefaultCredsWorkflowRoutes);
+app.use('/api/v1/test-sensitive-disclosure', testSensitiveDisclosureWorkflowRoutes);
+app.use('/api/v1/test-file-upload', testFileUploadWorkflowRoutes);
+app.use('/api/test-files', testPathTraversalWorkflowRoutes);
+app.use('/api/test-insecure-download', testInsecureFileDownloadWorkflowRoutes);
+app.use('/api/test-sqli', testSqlInjectionWorkflowRoutes);
+app.use('/api/test-nosql', testNoSqlInjectionWorkflowRoutes);
+app.use('/api/test-command-injection', testCommandInjectionWorkflowRoutes);
+app.use('/api/test-ssti', testSstiWorkflowRoutes);
+app.use('/api/test-xxe', testXxeWorkflowRoutes);
+app.use('/api/test-xss', testXssWorkflowRoutes);
+app.use('/api/test-csrf', testCsrfWorkflowRoutes);
+app.use('/api/test-open-redirect', testOpenRedirectWorkflowRoutes);
+app.use('/api/test-ssrf', testSsrfWorkflowRoutes);
+app.use('/api/test-host-header', testHostHeaderWorkflowRoutes);
+app.use('/api/test-http-smuggling', testHttpRequestSmugglingWorkflowRoutes);
+app.use('/api/test-directory-listing', testDirectoryListingRoutes);
+app.use('/api/test-backup-file-exposure', testBackupFileExposureRoutes);
+app.use('/api/test-git-exposure', testGitExposureRoutes);
+app.use('/api/test-debug-mode', testDebugModeRoutes);
+
+
 
 
 // Base Check endpoint

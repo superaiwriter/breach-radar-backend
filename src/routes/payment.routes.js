@@ -9,6 +9,7 @@ const SubscriptionPlan = require('../models/SubscriptionPlan');
 const Subscription = require('../models/Subscription');
 const PaymentTransaction = require('../models/PaymentTransaction');
 const billingService = require('../services/billing.service');
+const paypalService = require('../services/paypal.service');
 const logger = require('../config/logger');
 const {
   getRazorpayClient,
@@ -633,6 +634,270 @@ router.post('/webhook', async (req, res, next) => {
     res.status(200).json({ status: 'ok' });
   } catch (error) {
     logger.error(`[webhook] Webhook execution error: ${error.message}`);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/payment/paypal/create-order
+ * Create a new PayPal payment order for subscription upgrade.
+ */
+router.post('/paypal/create-order', authenticateJWT, requireTeamRole(['OWNER']), async (req, res, next) => {
+  try {
+    const { planId, billingCycle = 'monthly', returnBaseUrl } = req.body;
+    logger.info(`[payment-routes-paypal] Create order called by user=${req.user?._id || 'unknown'} planId=${planId} billingCycle=${billingCycle}`);
+
+    if (!planId) {
+      return res.status(400).json({ message: 'planId is required.' });
+    }
+
+    if (!['monthly', 'yearly'].includes(billingCycle)) {
+      return res.status(400).json({ message: 'billingCycle must be monthly or yearly.' });
+    }
+
+    // Find plan
+    let plan;
+    if (mongoose.Types.ObjectId.isValid(planId)) {
+      plan = await SubscriptionPlan.findById(planId);
+    } else {
+      plan = await SubscriptionPlan.findOne({ name: planId, isActive: true });
+    }
+
+    if (!plan) {
+      return res.status(404).json({ message: 'Selected plan is not available.' });
+    }
+
+    const price = plan.price || 0;
+    const cycleMultiplier = billingCycle === 'yearly' ? 10 : 1;
+    const amountInINR = price * cycleMultiplier;
+
+    if (amountInINR <= 0) {
+      return res.status(400).json({ message: 'Cannot create order for zero-amount plans.' });
+    }
+
+    // PayPal does not support INR, so convert INR to USD (1 USD = 83 INR)
+    const usdAmount = Number((amountInINR / 83).toFixed(2));
+    logger.info(`[payment-routes-paypal] Converted amountINR=${amountInINR} to amountUSD=${usdAmount}`);
+
+    const origin = returnBaseUrl || req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5180';
+    const returnUrl = `${origin.split('?')[0]}?paypal-success=true`;
+    const cancelUrl = `${origin.split('?')[0]}?paypal-cancel=true`;
+
+    // Create PayPal order via PayPal Service
+    const paypalOrder = await paypalService.createOrder(usdAmount, 'USD', returnUrl, cancelUrl);
+
+    if (!paypalOrder?.id) {
+      return res.status(502).json({ message: 'PayPal did not return an order ID.' });
+    }
+
+    // Find approval link
+    const approveLinkObj = paypalOrder.links.find(link => link.rel === 'approve');
+    if (!approveLinkObj) {
+      return res.status(502).json({ message: 'PayPal order approval URL not found.' });
+    }
+
+    // Save pending transaction in our database
+    const transactionId = `txn_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    await PaymentTransaction.create({
+      userId: req.user._id,
+      organizationId: req.organization._id,
+      provider: 'paypal',
+      providerOrderId: paypalOrder.id,
+      transactionId,
+      amount: usdAmount,
+      currency: 'USD',
+      status: 'pending',
+      metadata: {
+        planName: plan.name,
+        billingCycle,
+        amountInINR,
+        source: 'billing_upgrade'
+      }
+    });
+
+    logger.info(`[payment-routes-paypal] Created PayPal pending orderId=${paypalOrder.id} transactionId=${transactionId}`);
+
+    return res.status(200).json({
+      orderId: paypalOrder.id,
+      approvalUrl: approveLinkObj.href,
+      amount: usdAmount,
+      currency: 'USD'
+    });
+  } catch (error) {
+    logger.error(`[payment-routes-paypal] Create PayPal order failed: ${error.message}`);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/payment/paypal/capture
+ * Capture approved PayPal order and activate subscription.
+ */
+router.post('/paypal/capture', authenticateJWT, requireTeamRole(['OWNER']), async (req, res, next) => {
+  const auditService = require('../services/audit.service');
+  const { orderId } = req.body;
+  try {
+    logger.info(`[payment-routes-paypal] Capture request orderId=${orderId} user=${req.user?._id}`);
+
+    if (!orderId) {
+      return res.status(400).json({ message: 'PayPal orderId is required.' });
+    }
+
+    // Find matching pending transaction
+    const transaction = await PaymentTransaction.findOne({ providerOrderId: orderId, provider: 'paypal' });
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transaction reference not found.' });
+    }
+
+    if (transaction.status === 'succeeded') {
+      return res.status(200).json({ message: 'Payment has already been processed.' });
+    }
+
+    // Execute PayPal capture
+    const captureResult = await paypalService.captureOrder(orderId);
+
+    // Get the capture ID from purchase units
+    const purchaseUnit = captureResult.purchase_units?.[0];
+    const capture = purchaseUnit?.payments?.captures?.[0];
+    const captureStatus = capture?.status || captureResult.status;
+
+    if (captureStatus !== 'COMPLETED') {
+      logger.error(`[payment-routes-paypal] PayPal capture status not completed: ${captureStatus}`);
+      return res.status(400).json({ message: `Payment capture status is ${captureStatus}` });
+    }
+
+    const providerPaymentId = capture?.id || 'paypal_capture';
+
+    // Update transaction attributes
+    transaction.status = 'succeeded';
+    transaction.providerPaymentId = providerPaymentId;
+    await transaction.save();
+
+    const planName = transaction.metadata?.planName || 'Professional';
+    const billingCycle = transaction.metadata?.billingCycle || 'monthly';
+
+    // Retrieve plan metadata
+    const plan = await SubscriptionPlan.findOne({ name: planName, isActive: true });
+    if (!plan) {
+      return res.status(404).json({ message: `Target plan "${planName}" is not available.` });
+    }
+
+    // Fetch subscription
+    const subscription = await Subscription.findOne({ organizationId: req.organization._id });
+    if (!subscription) {
+      return res.status(404).json({ message: 'Subscription reference not found.' });
+    }
+
+    // Activate the subscription
+    await billingService.changePlanImmediate(
+      req.user,
+      req.organization,
+      subscription,
+      plan,
+      billingCycle,
+      'paid',
+      transaction.transactionId
+    );
+
+    // Audit Log for Payment Success
+    await auditService.logRequestAudit(
+      req,
+      'Payment Success',
+      `PayPal payment succeeded for plan ${plan.name} (${billingCycle}). Order ID: ${orderId}. Capture ID: ${providerPaymentId}.`
+    );
+
+    // Notification
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        organizationId: req.organization._id,
+        userId: req.user._id,
+        email: req.user.email,
+        type: 'PAYMENT_SUCCESS',
+        title: 'Payment Successful',
+        message: `Your PayPal payment was verified successfully for the ${plan.name} plan.`
+      });
+    } catch (notifErr) {
+      logger.error(`[payment-routes-paypal] Failed to create payment success notification: ${notifErr.message}`);
+    }
+
+    return res.status(200).json({
+      message: 'Plan upgraded successfully.',
+      planName: plan.name,
+      paypalOrderId: orderId,
+      paypalCaptureId: providerPaymentId
+    });
+  } catch (error) {
+    logger.error(`[payment-routes-paypal] PayPal capture handler failed: ${error.message}`);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/payment/paypal/webhook
+ * PayPal Webhook receiver for async payment events.
+ */
+router.post('/paypal/webhook', async (req, res, next) => {
+  try {
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+    if (!webhookId) {
+      logger.warn('[paypal-webhook] Webhook verification bypassed: PAYPAL_WEBHOOK_ID is not set.');
+    } else {
+      const isValid = await paypalService.verifyWebhookSignature(req.headers, req.body, webhookId);
+      if (!isValid) {
+        logger.warn('[paypal-webhook] Webhook signature verification failed.');
+        return res.status(400).json({ message: 'Invalid webhook signature.' });
+      }
+    }
+
+    const event = req.body;
+    const eventType = event.event_type;
+    const resource = event.resource;
+
+    logger.info(`[paypal-webhook] PayPal event received=${eventType}`);
+
+    if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+      const providerOrderId = resource.supplementary_data?.related_ids?.order_id || resource.parent_payment;
+      const providerPaymentId = resource.id;
+
+      if (providerOrderId) {
+        const transaction = await PaymentTransaction.findOne({ providerOrderId, provider: 'paypal' });
+        if (transaction && transaction.status !== 'succeeded') {
+          transaction.status = 'succeeded';
+          transaction.providerPaymentId = providerPaymentId;
+          await transaction.save();
+
+          const planName = transaction.metadata?.planName || 'Professional';
+          const billingCycle = transaction.metadata?.billingCycle || 'monthly';
+
+          const plan = await SubscriptionPlan.findOne({ name: planName, isActive: true });
+          const User = require('../models/User');
+          const Organization = require('../models/Organization');
+          const Subscription = require('../models/Subscription');
+
+          const user = await User.findById(transaction.userId);
+          const organization = await Organization.findById(transaction.organizationId);
+          const subscription = await Subscription.findOne({ organizationId: transaction.organizationId });
+
+          if (plan && user && organization && subscription) {
+            await billingService.changePlanImmediate(
+              user,
+              organization,
+              subscription,
+              plan,
+              billingCycle,
+              'paid',
+              transaction.transactionId
+            );
+            logger.info(`[paypal-webhook] Successfully processed payment asynchronously for Org: ${organization.name}`);
+          }
+        }
+      }
+    }
+
+    return res.status(200).json({ status: 'ok' });
+  } catch (error) {
+    logger.error(`[paypal-webhook] PayPal webhook error: ${error.message}`);
     next(error);
   }
 });

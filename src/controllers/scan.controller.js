@@ -45,7 +45,7 @@ const getScanResults = async (req, res, next) => {
 // POST /api/v1/scans
 const startScan = async (req, res, next) => {
   try {
-    const { domain, scanType, checks } = req.body;
+    const { domain, scanType, checks, authProfileId } = req.body;
 
     const Workspace = require('../models/Workspace');
     const Organization = require('../models/Organization');
@@ -82,7 +82,8 @@ const startScan = async (req, res, next) => {
       userId: req.user._id,
       domain,
       scanType,
-      checks
+      checks,
+      authProfileId
     });
 
     logger.info(`Scan started for ${domain} (Type: ${scanType}) by user ${req.user.email}`);

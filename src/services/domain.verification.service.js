@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const dns = require('dns').promises;
 const https = require('https');
 const http = require('http');
+const logger = require('../config/logger');
 const {
   DOMAIN_VERIFICATION_STATUS,
   DOMAIN_VERIFICATION_METHODS,
@@ -54,11 +55,28 @@ function isDomainVerified(domainDoc) {
   return domainDoc?.verificationStatus === DOMAIN_VERIFICATION_STATUS.VERIFIED;
 }
 
+// DEV-ONLY BYPASS: requires BOTH NODE_ENV=development AND an explicit opt-in
+// flag, so this can never silently activate in production (defense in depth —
+// a stray NODE_ENV=development alone is not enough to bypass real-domain
+// ownership verification). Every bypassed check is logged for auditability.
+// This exists purely so scans can be tested locally without completing DNS/HTML
+// verification for every throwaway test domain.
+function isVerificationBypassed() {
+  return process.env.NODE_ENV === 'development' && process.env.ALLOW_UNVERIFIED_DOMAIN_SCANS === 'true';
+}
+
 function assertDomainVerified(domainDoc) {
   if (!domainDoc) {
     const error = new Error('Domain not found.');
     error.statusCode = 404;
     throw error;
+  }
+
+  if (isVerificationBypassed() && !isDomainVerified(domainDoc)) {
+    logger.warn(
+      `[domain-verification] BYPASSED for "${domainDoc.domain}" (status: ${domainDoc.verificationStatus}) — NODE_ENV=development and ALLOW_UNVERIFIED_DOMAIN_SCANS=true. This must never be enabled in production.`
+    );
+    return;
   }
 
   if (domainDoc.verificationStatus === DOMAIN_VERIFICATION_STATUS.REJECTED) {

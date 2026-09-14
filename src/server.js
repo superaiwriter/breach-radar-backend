@@ -106,3 +106,5 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 startServer();
+
+// Trigger restart to reload .env config

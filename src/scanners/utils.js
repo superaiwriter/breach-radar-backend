@@ -6,9 +6,15 @@ function createFinding({
   severity,
   cwe = '',
   path = '/',
+  parameter = '',
   impact = '',
   fix = '',
-  scanner = ''
+  scanner = '',
+  category = '',
+  subCategory = '',
+  cvssScore = null,
+  evidence = '',
+  references = []
 }) {
   const tone = severity.toLowerCase();
   return {
@@ -18,9 +24,15 @@ function createFinding({
     tone: ['critical', 'high', 'medium', 'low'].includes(tone) ? tone : 'medium',
     cwe,
     path,
+    parameter,
     impact,
     fix,
-    scanner
+    scanner,
+    category,
+    subCategory,
+    cvssScore,
+    evidence,
+    references
   };
 }
 

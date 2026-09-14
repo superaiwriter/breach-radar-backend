@@ -1,10 +1,15 @@
 const rateLimit = require('express-rate-limit');
 const logger = require('../config/logger');
 
+const isTestOrDev = () => {
+  return process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || process.env.SKIP_RATE_LIMITS === 'true';
+};
+
 // General API request limiter (max 100 requests per minute)
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 100,
+  skip: isTestOrDev,
   message: {
     message: 'Too many requests from this client. Please try again after some time.'
   },
@@ -20,6 +25,7 @@ const generalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
+  skip: isTestOrDev,
   message: {
     message: 'Too many authentication attempts. Please wait 15 minutes before trying again.'
   },
@@ -35,6 +41,7 @@ const authLimiter = rateLimit({
 const supportTicketLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
+  skip: isTestOrDev,
   message: {
     success: false,
     message: 'Too many support ticket submissions. Please try again after 10 minutes.'

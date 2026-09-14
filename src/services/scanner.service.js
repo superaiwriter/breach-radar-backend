@@ -4,6 +4,8 @@ const Vulnerability = require('../models/Vulnerability');
 const { SCAN_STATUS, VULN_STATUS } = require('../constants');
 const { assertDomainVerified } = require('./domain.verification.service');
 const { runScanners } = require('../scanners');
+const authProfileService = require('./authProfile.service');
+const authSessionService = require('./authSession.service');
 const {
   countSeverities,
   computeRiskScore,
@@ -37,6 +39,7 @@ async function persistFindings(scan, findings) {
       workspaceId: scan.workspaceId,
       domainId: scan.domainId,
       scanId: scan._id,
+      scanner: finding.scanner || '',
       name: finding.name,
       desc: finding.desc,
       severity: finding.severity,
@@ -44,8 +47,14 @@ async function persistFindings(scan, findings) {
       tone: finding.tone,
       cwe: finding.cwe,
       path: finding.path,
+      parameter: finding.parameter || '',
       impact: finding.impact,
       fix: finding.fix,
+      category: finding.category || '',
+      subCategory: finding.subCategory || '',
+      cvssScore: finding.cvssScore ?? null,
+      evidence: finding.evidence || '',
+      references: finding.references || [],
       detectedAt: new Date()
     });
 
@@ -153,7 +162,31 @@ async function executeScan(scanId) {
 
     await markScanRunning(scan, domain);
 
-    const scannerMeta = await runScanners(domain.domain, scan.checks);
+    let authContext = null;
+    if (scan.authProfileId) {
+      try {
+        const decryptedProfile = await authProfileService.resolveDecryptedProfile(
+          scan.workspaceId,
+          scan.authProfileId
+        );
+        authContext = await authSessionService.resolveAuthContext(domain.domain, decryptedProfile);
+        authSessionService.storeContext(scan._id, authContext);
+        logger.info(`Scan ${scanId}: authenticated session established for ${domain.domain}`);
+      } catch (authError) {
+        // Authenticated mode failing shouldn't silently fall back to an
+        // unauthenticated scan (that would give a false sense of coverage) —
+        // fail the scan explicitly instead.
+        throw new Error(`Authenticated session setup failed: ${authError.message}`);
+      }
+    }
+
+    const scanContext = {
+      scanId: scan._id,
+      workspaceId: scan.workspaceId,
+      domainId: scan.domainId,
+      authProfileId: scan.authProfileId
+    };
+    const scannerMeta = await runScanners(domain.domain, scan.checks, authContext, scanContext);
     const findings = scannerMeta.findings;
 
     logger.info(
@@ -185,6 +218,10 @@ async function executeScan(scanId) {
     }
 
     throw error;
+  } finally {
+    if (scan) {
+      authSessionService.clearContext(scan._id);
+    }
   }
 }
 

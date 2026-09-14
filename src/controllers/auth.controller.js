@@ -94,7 +94,7 @@ const logout = async (req, res, next) => {
           description: 'User logged out',
           ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '',
           userAgent: req.headers['user-agent'] || ''
-        }).catch(() => {});
+        }).catch(() => { });
         await Session.deleteOne({ _id: session._id });
       }
     }

@@ -1,10 +1,30 @@
+const nodemailer = require('nodemailer');
 const logger = require('../../config/logger');
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const RESEND_DOMAINS_ENDPOINT = 'https://api.resend.com/domains';
+let transporterInstance = null;
 
-// FIX: onboarding@resend.dev is Resend's official test sender - works without domain verification
-const DEFAULT_SENDER = 'onboarding@resend.dev';
+function getTransporter() {
+  if (!transporterInstance) {
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
+    const secure = process.env.SMTP_SECURE !== undefined
+      ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
+      : port === 465;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    transporterInstance = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+    });
+  }
+  return transporterInstance;
+}
 
 let lastEmailStatus = {
   lastEmailAttempt: null,
@@ -27,13 +47,7 @@ function formatDate(value) {
 }
 
 function getSenderEmail() {
-  const sender = process.env.EMAIL_FROM || process.env.FROM_EMAIL || DEFAULT_SENDER;
-  // Safety: if someone left a gmail/non-resend address, fall back to test sender
-  if (sender.includes('gmail.com') || sender.includes('.local') || sender === 'noreply@yourdomain.com') {
-    logger.warn(`[email] Invalid sender "${sender}" detected — falling back to ${DEFAULT_SENDER}`);
-    return DEFAULT_SENDER;
-  }
-  return sender;
+  return process.env.EMAIL_FROM || process.env.SMTP_USER || '';
 }
 
 function maskEmailPayload(payload) {
@@ -56,69 +70,52 @@ function updateLastEmailStatus({ success, error = null }) {
 
 function getEmailStatus() {
   const senderEmail = getSenderEmail();
+  const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
   return {
-    resendConfigured: Boolean(process.env.RESEND_API_KEY),
+    smtpConfigured,
     senderEmail,
-    resendMode: senderEmail.endsWith('@resend.dev') ? 'test' : 'production',
     ...lastEmailStatus,
   };
 }
 
-function buildEmailError(payload, responseStatus) {
-  const resendMessage = payload.message || payload.error || 'Resend email delivery failed.';
-  const error = new Error(resendMessage);
-  error.statusCode = responseStatus;
-  error.code = payload.name || payload.code || 'RESEND_DELIVERY_FAILED';
-  error.details = payload;
-  return error;
-}
-
 // ─── CORE sendEmail FUNCTION ───────────────────────────────────────────────────
 async function sendEmail({ to, subject, html, text }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
   const from = getSenderEmail();
   const emailPayload = { from, to, subject, html, text };
 
   logger.info(`[email] Sending: ${JSON.stringify(maskEmailPayload(emailPayload))}`);
 
-  if (!apiKey) {
-    const reason = 'RESEND_API_KEY missing in .env';
+  if (!host || !user || !pass) {
+    const reason = 'SMTP configuration missing in .env';
     updateLastEmailStatus({ success: false, error: reason });
     logger.warn(`[email] ${reason}. Email to ${to} was NOT sent.`);
-    const error = new Error('Email provider is not configured. Please set RESEND_API_KEY in .env');
+    const error = new Error('Email provider is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env');
     error.statusCode = 503;
-    error.code = 'RESEND_API_KEY_MISSING';
+    error.code = 'SMTP_NOT_CONFIGURED';
     throw error;
   }
 
-  const response = await fetch(RESEND_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(emailPayload),
-  });
+  try {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail(emailPayload);
+    logger.info(`[email] SMTP response: ${JSON.stringify({
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+    })}`);
 
-  const payload = await response.json().catch(() => ({}));
-  logger.info(`[email] Resend API response: ${JSON.stringify({
-    ok: response.ok,
-    status: response.status,
-    id: payload.id,
-    name: payload.name,
-    message: payload.message,
-  })}`);
-
-  if (!response.ok) {
-    const error = buildEmailError(payload, response.status);
-    updateLastEmailStatus({ success: false, error: error.message });
-    logger.error(`[email] Delivery FAILED for ${to}: ${error.message}`);
-    throw error;
+    updateLastEmailStatus({ success: true });
+    logger.info(`[email] Delivered to ${to}. Message ID: ${info.messageId || 'unknown'}`);
+    return info;
+  } catch (err) {
+    updateLastEmailStatus({ success: false, error: err.message });
+    logger.error(`[email] Delivery FAILED for ${to}: ${err.message}`);
+    throw err;
   }
-
-  updateLastEmailStatus({ success: true });
-  logger.info(`[email] Delivered to ${to}. Resend ID: ${payload.id || 'unknown'}`);
-  return payload;
 }
 
 // ─── EMAIL TEMPLATES ───────────────────────────────────────────────────────────
@@ -307,40 +304,39 @@ async function sendInvoiceEmail({ to, invoiceNumber, planName, amount, date, dow
 }
 
 async function verifySenderDomainStatus() {
-  const apiKey = process.env.RESEND_API_KEY;
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
   const senderEmail = getSenderEmail();
-  const senderDomain = senderEmail.split('@')[1] || '';
 
-  if (!apiKey) {
-    return { configured: false, senderEmail, senderDomain, verified: false, reason: 'RESEND_API_KEY missing' };
-  }
+  const configured = Boolean(host && user && pass);
 
-  if (!senderDomain || senderDomain === 'resend.dev') {
+  if (!configured) {
     return {
-      configured: true, senderEmail, senderDomain,
-      verified: senderDomain === 'resend.dev',
-      reason: senderDomain === 'resend.dev' ? 'Using Resend test sender — works for testing.' : 'Sender email is invalid.',
+      configured: false,
+      senderEmail,
+      verified: false,
+      reason: 'SMTP configuration missing in .env',
     };
   }
 
-  const response = await fetch(RESEND_DOMAINS_ENDPOINT, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    return { configured: true, senderEmail, senderDomain, verified: false, reason: payload.message || 'Could not verify domain.', statusCode: response.status };
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    return {
+      configured: true,
+      senderEmail,
+      verified: true,
+      reason: 'SMTP connection verified successfully.',
+    };
+  } catch (err) {
+    return {
+      configured: true,
+      senderEmail,
+      verified: false,
+      reason: err.message || 'SMTP connection verification failed.',
+    };
   }
-
-  const domains = Array.isArray(payload.data) ? payload.data : [];
-  const match = domains.find((d) => d.name === senderDomain);
-
-  return {
-    configured: true, senderEmail, senderDomain,
-    verified: Boolean(match && match.status === 'verified'),
-    status: match?.status || 'not_found',
-    reason: match ? `Domain status: ${match.status}` : 'Domain not found in Resend verified domains.',
-  };
 }
 
 module.exports = {
