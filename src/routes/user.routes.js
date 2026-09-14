@@ -6,10 +6,14 @@ const authenticateJWT = require('../middleware/auth');
 const userController = require('../controllers/user.controller');
 
 const router = express.Router();
-const uploadRoot = process.env.AVATAR_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'avatars');
+const uploadRoot = process.env.AVATAR_UPLOAD_DIR || path.resolve(__dirname, '../../uploads/avatars');
 const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 
-fs.mkdirSync(uploadRoot, { recursive: true });
+try {
+  fs.mkdirSync(uploadRoot, { recursive: true });
+} catch (e) {
+  // Directory might already exist
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadRoot),

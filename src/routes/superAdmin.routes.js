@@ -43,6 +43,7 @@ router.get('/reports', superAdminController.getReports);
 router.get('/subscriptions', superAdminController.getSubscriptionPlans);
 router.post('/subscriptions', superAdminController.createSubscriptionPlan);
 router.put('/subscriptions/:id', superAdminController.updateSubscriptionPlan);
+router.patch('/subscriptions/:id/status', superAdminController.toggleSubscriptionPlanStatus);
 router.delete('/subscriptions/:id', superAdminController.deleteSubscriptionPlan);
 
 // Customer Subscriptions Visibility & Operations

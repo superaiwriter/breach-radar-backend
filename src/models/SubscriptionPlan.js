@@ -4,13 +4,17 @@ const SubscriptionPlanSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    enum: ['Starter', 'Professional', 'Business', 'Enterprise'],
     unique: true,
     trim: true
   },
   displayName: {
     type: String,
     trim: true
+  },
+  description: {
+    type: String,
+    trim: true,
+    default: ''
   },
   price: {
     type: Number,
@@ -23,7 +27,7 @@ const SubscriptionPlanSchema = new mongoose.Schema({
   },
   billingInterval: {
     type: String,
-    enum: ['month', 'custom'],
+    enum: ['month', 'year', 'custom'],
     default: 'month'
   },
   seatLimit: {
@@ -48,6 +52,14 @@ const SubscriptionPlanSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
     index: true
+  },
+  isPopular: {
+    type: Boolean,
+    default: false
+  },
+  ctaText: {
+    type: String,
+    default: 'Get Started'
   },
   features: [{
     type: String

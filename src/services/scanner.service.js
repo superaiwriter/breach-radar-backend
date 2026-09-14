@@ -29,6 +29,19 @@ async function markScanRunning(scan, domain) {
 
   domain.statusDetail = 'Scan in progress...';
   await domain.save();
+
+  try {
+    const Notification = require('../models/Notification');
+    const targetUserId = scan.triggeredBy && scan.triggeredBy !== 'system' ? scan.triggeredBy : null;
+    await Notification.create({
+      userId: targetUserId,
+      type: 'SCAN_STARTED',
+      title: `Scan Started: ${domain.domain}`,
+      message: `A ${scan.scanType || 'Full'} scan has started on ${domain.domain}.`
+    });
+  } catch (err) {
+    logger.debug(`[scanner] Failed to create scan start notification: ${err.message}`);
+  }
 }
 
 async function persistFindings(scan, findings) {
@@ -101,6 +114,39 @@ async function markScanCompleted(scan, domain, findings, scannerMeta) {
   });
 
   try {
+    const Notification = require('../models/Notification');
+    const targetUserId = scan.triggeredBy && scan.triggeredBy !== 'system' ? scan.triggeredBy : null;
+    const crit = counts.critical || 0;
+    const high = counts.high || 0;
+    const total = findings.length;
+
+    let notifType = 'SCAN_COMPLETED';
+    let notifTitle = `Scan Completed: ${domain.domain}`;
+    let notifMsg = `Scan finished cleanly on ${domain.domain}. Security Score: ${domainScore}/100.`;
+
+    if (crit > 0) {
+      notifType = 'CRITICAL_VULNERABILITY';
+      notifTitle = `🚨 Critical Risk Detected: ${domain.domain}`;
+      notifMsg = `Scan found ${crit} critical and ${high} high severity issues on ${domain.domain}. Immediate fix recommended.`;
+    } else if (high > 0) {
+      notifType = 'HIGH_VULNERABILITY';
+      notifTitle = `⚠️ High Severity Issues: ${domain.domain}`;
+      notifMsg = `Scan completed with ${high} high severity issues on ${domain.domain}. Review the report.`;
+    } else if (total > 0) {
+      notifMsg = `Scan completed with ${total} low/medium findings on ${domain.domain}. Score: ${domainScore}/100.`;
+    }
+
+    await Notification.create({
+      userId: targetUserId,
+      type: notifType,
+      title: notifTitle,
+      message: notifMsg
+    });
+  } catch (err) {
+    logger.debug(`[scanner] Failed to create scan completion notification: ${err.message}`);
+  }
+
+  try {
     const alertService = require('./alert.service');
     await alertService.handleScanCompletedAlerts(scan, domain, counts);
   } catch (alertError) {
@@ -130,6 +176,19 @@ async function markScanFailed(scan, errorMessage) {
     description: `Scan failed for domain ${domain ? domain.domain : 'unknown'}. Error: ${errorMessage}`,
     status: 'Failure'
   });
+
+  try {
+    const Notification = require('../models/Notification');
+    const targetUserId = scan.triggeredBy && scan.triggeredBy !== 'system' ? scan.triggeredBy : null;
+    await Notification.create({
+      userId: targetUserId,
+      type: 'SCAN_FAILED',
+      title: `Scan Failed: ${domain ? domain.domain : 'Domain'}`,
+      message: `The security scan could not be completed: ${errorMessage}`
+    });
+  } catch (err) {
+    logger.debug(`[scanner] Failed to create scan fail notification: ${err.message}`);
+  }
 }
 
 /**

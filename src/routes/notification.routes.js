@@ -10,5 +10,9 @@ router.get('/', notificationController.getNotifications);
 router.get('/settings', notificationController.getSettings);
 router.put('/settings', notificationController.updateSettings);
 router.post('/test', notificationController.sendTestNotification);
+router.patch('/read-all', notificationController.markAllAsRead);
+router.patch('/:id/read', notificationController.markAsRead);
+router.delete('/:id', notificationController.deleteNotification);
+router.delete('/', notificationController.clearAllNotifications);
 
 module.exports = router;

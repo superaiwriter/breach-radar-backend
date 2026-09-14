@@ -107,13 +107,14 @@ async function removeLocalAvatar(avatarUrl) {
   if (!avatarUrl || !avatarUrl.startsWith(LOCAL_UPLOAD_PREFIX)) return;
 
   const relativePath = avatarUrl.replace(/^\/uploads\//, '');
-  const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
+  const uploadsDir = process.env.UPLOADS_DIR || path.resolve(__dirname, '../../uploads');
+  const absolutePath = path.join(uploadsDir, relativePath);
 
   try {
     await fs.unlink(absolutePath);
   } catch (error) {
     if (error.code !== 'ENOENT') {
-      throw error;
+      // Safely ignore or non-fatal
     }
   }
 }

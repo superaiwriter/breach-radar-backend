@@ -77,20 +77,33 @@ const registerUser = async ({ email, password, name }) => {
   logger.info(`New user registered: ${email} (Workspace ID: ${workspace._id})`);
 
   // Send verification email
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const verifyUrl = `${frontendUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    logger.error('[auth] FRONTEND_URL is not configured in environment variables. Verification link cannot be constructed safely.');
+  }
+  const baseUrl = (frontendUrl || '').replace(/\/+$/, '');
+  const verifyUrl = `${baseUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
 
   const html = `
     <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
       <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+<<<<<<< HEAD
           <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
           <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
+=======
+          <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">P</div>
+          <span style="font-size:20px;font-weight:900;color:#ffffff">Pentestradar</span>
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
         </div>
         <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">Verify Your Email Address</h1>
         <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6">
           Hi <strong style="color:#ffffff">${name}</strong>,<br><br>
+<<<<<<< HEAD
           Thank you for creating your PentestRadar account! Please verify your email to activate it.
+=======
+          Thank you for creating your Pentestradar account! Please verify your email to activate it.
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
         </p>
         <div style="background:#091421;border:1px solid #20324a;border-radius:10px;padding:18px;margin-bottom:22px">
           <p style="margin:0 0 8px;color:#aeb8c7;font-size:13px">Account Email</p>
@@ -112,7 +125,11 @@ const registerUser = async ({ email, password, name }) => {
 
   sendEmail({
     to: email,
+<<<<<<< HEAD
     subject: 'PentestRadar — Verify Your Email Address',
+=======
+    subject: 'Pentestradar — Verify Your Email Address',
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
     html,
     text: `Verify your email: ${verifyUrl}\n\nExpires in 24 hours.`
   }).catch((err) => {
@@ -332,8 +349,12 @@ const forgotPassword = async ({ email }) => {
   await user.save();
 
   // Build reset link
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    logger.error('[auth] FRONTEND_URL is not configured in environment variables. Password reset link cannot be constructed safely.');
+  }
+  const baseUrl = (frontendUrl || '').replace(/\/+$/, '');
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
   // Send email
   const html = `
@@ -341,7 +362,7 @@ const forgotPassword = async ({ email }) => {
       <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
         <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">Reset Your Password</h1>
         <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6">
-          We received a request to reset the password for your PentestRadar account.
+          We received a request to reset the password for your Pentestradar account.
           Click the button below to set a new password.
         </p>
         <div style="background:#091421;border:1px solid #20324a;border-radius:10px;padding:18px;margin-bottom:22px">
@@ -367,23 +388,17 @@ const forgotPassword = async ({ email }) => {
   try {
     await sendEmail({
       to: email,
-      subject: 'PentestRadar — Reset Your Password',
+      subject: 'Pentestradar — Reset Your Password',
       html,
       text
     });
     logger.info(`[forgot-password] Reset email sent to: ${email}`);
   } catch (emailErr) {
-    // Clear token if email fails
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
-    await user.save();
-    logger.error(`[forgot-password] Email send failed for ${email}: ${emailErr.message}`);
-    const err = new Error('Failed to send reset email. Please try again.');
-    err.statusCode = 503;
-    throw err;
+    logger.error(`[forgot-password] Email send failed: ${emailErr.message}`);
+    // Don't leak provider failure details to client
   }
 
-  return { message: 'If this email exists, a reset link has been sent.' };
+  return { message: 'If that email is registered, a password reset link has been sent.' };
 };
 
 const resetPassword = async ({ token, email, newPassword }) => {
@@ -399,30 +414,29 @@ const resetPassword = async ({ token, email, newPassword }) => {
     throw err;
   }
 
-  // Hash the incoming token to compare with stored hash
+  // Hash incoming token to match DB
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
   const user = await User.findOne({
     email: email.toLowerCase().trim(),
     passwordResetToken: tokenHash,
-    passwordResetExpires: { $gt: new Date() } // Not expired
+    passwordResetExpires: { $gt: new Date() } // Must not be expired
   });
 
   if (!user) {
-    const err = new Error('Invalid or expired reset link. Please request a new one.');
+    const err = new Error('Password reset token is invalid or has expired. Please request a new one.');
     err.statusCode = 400;
     throw err;
   }
 
-  // Set new password
+  // Hash new password & clear reset token fields
   user.passwordHash = await hashPassword(newPassword);
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
-  user.security.lastPasswordChange = new Date();
+  user.refreshTokens = []; // Invalidate all existing sessions on password change
   await user.save();
 
-  logger.info(`[reset-password] Password reset successful for: ${email}`);
-
+  logger.info(`Password successfully reset for: ${email}`);
   return { message: 'Password has been reset successfully. You can now log in.' };
 };
 
@@ -430,7 +444,7 @@ const resetPassword = async ({ token, email, newPassword }) => {
 
 const verifyEmail = async ({ token, email }) => {
   if (!token || !email) {
-    const err = new Error('Token and email are required.');
+    const err = new Error('Verification token and email are required.');
     err.statusCode = 400;
     throw err;
   }
@@ -444,23 +458,28 @@ const verifyEmail = async ({ token, email }) => {
   });
 
   if (!user) {
-    const err = new Error('Invalid or expired verification link. Please request a new one.');
+    const err = new Error('Verification link is invalid or has expired. Please request a new one.');
     err.statusCode = 400;
     throw err;
   }
 
-  // Activate account
   user.isEmailVerified = true;
-  user.status = 'active';
   user.emailVerifyToken = null;
   user.emailVerifyExpires = null;
+  if (user.status === 'pending') {
+    user.status = 'active';
+  }
   await user.save();
 
+<<<<<<< HEAD
   // Send welcome email now that they verified
   sendWelcomeEmail({ to: user.email, name: user.profile.name }).catch(() => { });
+=======
+  // Send welcome email after verification
+  sendWelcomeEmail({ to: user.email, name: user.profile.name }).catch(() => {});
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
   logger.info(`[verify-email] Email verified: ${email}`);
-
   return { message: 'Email verified successfully! You can now log in.' };
 };
 
@@ -486,15 +505,24 @@ const resendVerificationEmail = async ({ email }) => {
   user.emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await user.save();
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const verifyUrl = `${frontendUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    logger.error('[auth] FRONTEND_URL is not configured in environment variables. Verification link cannot be constructed safely.');
+  }
+  const baseUrl = (frontendUrl || '').replace(/\/+$/, '');
+  const verifyUrl = `${baseUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
 
   const html = `
     <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
       <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+<<<<<<< HEAD
           <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
           <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
+=======
+          <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">P</div>
+          <span style="font-size:20px;font-weight:900;color:#ffffff">Pentestradar</span>
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
         </div>
         <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">New Verification Link</h1>
         <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6">
@@ -513,7 +541,11 @@ const resendVerificationEmail = async ({ email }) => {
 
   await sendEmail({
     to: email,
+<<<<<<< HEAD
     subject: 'PentestRadar — New Verification Link',
+=======
+    subject: 'Pentestradar — New Verification Link',
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
     html,
     text: `New verification link: ${verifyUrl}`
   });

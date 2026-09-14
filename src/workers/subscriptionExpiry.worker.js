@@ -98,9 +98,12 @@ async function retryFailedInvoiceEmails() {
     for (const invoice of failedInvoices) {
       try {
         const user = await User.findById(invoice.userId);
-        if (!user) continue;
-
-        const downloadLink = invoice.pdfUrl || `${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/invoices/${invoice.invoiceNumber}.pdf`;
+        const backendUrl = process.env.BACKEND_URL;
+        if (!backendUrl && !invoice.pdfUrl) {
+          logger.error('[subscription-worker] BACKEND_URL is not configured in environment variables for invoice download link.');
+        }
+        const safeBackendUrl = (backendUrl || '').replace(/\/+$/, '');
+        const downloadLink = invoice.pdfUrl || `${safeBackendUrl}/uploads/invoices/${invoice.invoiceNumber}.pdf`;
         
         invoice.emailDeliveryAttempts += 1;
         

@@ -691,7 +691,7 @@ const getVulnerabilities = async (req, res, next) => {
 // 6. SUBSCRIPTION PLAN MANAGEMENT
 const getSubscriptionPlans = async (req, res, next) => {
   try {
-    const plans = await SubscriptionPlan.find();
+    const plans = await SubscriptionPlan.find().sort({ sortOrder: 1, price: 1 });
     res.status(200).json(plans);
   } catch (error) {
     next(error);
@@ -700,13 +700,47 @@ const getSubscriptionPlans = async (req, res, next) => {
 
 const createSubscriptionPlan = async (req, res, next) => {
   try {
-    const { name, price, domainLimit, scanLimit, features } = req.body;
-    const plan = new SubscriptionPlan({
+    const {
       name,
+      displayName,
+      description,
       price,
-      domainLimit,
-      scanLimit,
-      features
+      currency = 'INR',
+      billingInterval = 'month',
+      seatLimit = 1,
+      domainLimit = 1,
+      scanLimit = 5,
+      sortOrder = 0,
+      isActive = true,
+      isPopular = false,
+      ctaText = 'Get Started',
+      features = []
+    } = req.body;
+
+    if (!name || price === undefined || domainLimit === undefined || scanLimit === undefined) {
+      return res.status(400).json({ message: 'Plan name, price, domainLimit, and scanLimit are required.' });
+    }
+
+    const existing = await SubscriptionPlan.findOne({ name: name.trim() });
+    if (existing) {
+      return res.status(400).json({ message: `Plan with name "${name}" already exists.` });
+    }
+
+    const plan = new SubscriptionPlan({
+      name: name.trim(),
+      displayName: displayName?.trim() || name.trim(),
+      description: description?.trim() || '',
+      price: Number(price),
+      currency: currency || 'INR',
+      billingInterval: billingInterval || 'month',
+      seatLimit: Number(seatLimit) || 1,
+      domainLimit: Number(domainLimit),
+      scanLimit: Number(scanLimit),
+      sortOrder: Number(sortOrder) || 0,
+      isActive: Boolean(isActive),
+      isPopular: Boolean(isPopular),
+      ctaText: ctaText?.trim() || (Number(price) === 0 ? 'Get Started Free' : 'Get Started'),
+      features: Array.isArray(features) ? features.map(f => typeof f === 'string' ? f.trim() : f).filter(Boolean) : []
     });
 
     await plan.save();
@@ -726,16 +760,48 @@ const createSubscriptionPlan = async (req, res, next) => {
 
 const updateSubscriptionPlan = async (req, res, next) => {
   try {
-    const { name, price, domainLimit, scanLimit, features } = req.body;
-    const plan = await SubscriptionPlan.findByIdAndUpdate(
-      req.params.id,
-      { name, price, domainLimit, scanLimit, features },
-      { new: true }
-    );
-
+    const plan = await SubscriptionPlan.findById(req.params.id);
     if (!plan) {
       return res.status(404).json({ message: 'Plan not found' });
     }
+
+    const {
+      name,
+      displayName,
+      description,
+      price,
+      currency,
+      billingInterval,
+      seatLimit,
+      domainLimit,
+      scanLimit,
+      sortOrder,
+      isActive,
+      isPopular,
+      ctaText,
+      features
+    } = req.body;
+
+    if (name !== undefined) plan.name = name.trim();
+    if (displayName !== undefined) plan.displayName = displayName.trim();
+    if (description !== undefined) plan.description = description.trim();
+    if (price !== undefined) plan.price = Number(price);
+    if (currency !== undefined) plan.currency = currency;
+    if (billingInterval !== undefined) plan.billingInterval = billingInterval;
+    if (seatLimit !== undefined) plan.seatLimit = Number(seatLimit);
+    if (domainLimit !== undefined) plan.domainLimit = Number(domainLimit);
+    if (scanLimit !== undefined) plan.scanLimit = Number(scanLimit);
+    if (sortOrder !== undefined) plan.sortOrder = Number(sortOrder);
+    if (isActive !== undefined) plan.isActive = Boolean(isActive);
+    if (isPopular !== undefined) plan.isPopular = Boolean(isPopular);
+    if (ctaText !== undefined) plan.ctaText = ctaText.trim();
+    if (features !== undefined) {
+      plan.features = Array.isArray(features)
+        ? features.map(f => typeof f === 'string' ? f.trim() : f).filter(Boolean)
+        : [];
+    }
+
+    await plan.save();
 
     await logAuditEvent({
       req,
@@ -745,6 +811,32 @@ const updateSubscriptionPlan = async (req, res, next) => {
     });
 
     res.status(200).json({ message: 'Plan updated successfully', plan });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const toggleSubscriptionPlanStatus = async (req, res, next) => {
+  try {
+    const plan = await SubscriptionPlan.findById(req.params.id);
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    plan.isActive = req.body.isActive !== undefined ? Boolean(req.body.isActive) : !plan.isActive;
+    await plan.save();
+
+    await logAuditEvent({
+      req,
+      action: 'Plan Changes',
+      description: `${plan.isActive ? 'Activated' : 'Deactivated'} subscription plan: ${plan.name}`,
+      userId: req.user._id
+    });
+
+    res.status(200).json({
+      message: `Plan ${plan.name} is now ${plan.isActive ? 'active' : 'inactive'}`,
+      plan
+    });
   } catch (error) {
     next(error);
   }
@@ -1110,6 +1202,7 @@ module.exports = {
   getSubscriptionPlans,
   createSubscriptionPlan,
   updateSubscriptionPlan,
+  toggleSubscriptionPlanStatus,
   deleteSubscriptionPlan,
   getPayments,
   refundPayment,

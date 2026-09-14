@@ -33,7 +33,14 @@ let lastEmailStatus = {
 };
 
 function getFrontendInviteBaseUrl() {
-  return process.env.FRONTEND_INVITE_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173/invite';
+  if (process.env.FRONTEND_INVITE_BASE_URL) {
+    return process.env.FRONTEND_INVITE_BASE_URL.replace(/\/+$/, '');
+  }
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    logger.error('[email] FRONTEND_URL or FRONTEND_INVITE_BASE_URL is not configured in environment variables.');
+  }
+  return frontendUrl ? `${frontendUrl.replace(/\/+$/, '')}/invite` : '/invite';
 }
 
 function formatDate(value) {
@@ -131,7 +138,7 @@ function buildInvitationEmail({ organizationName, role, token, expiresAt }) {
       <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
         <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
+            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">P</div>
             <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
           </div>
           <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">You've been invited!</h1>
@@ -168,14 +175,18 @@ function buildInvitationEmail({ organizationName, role, token, expiresAt }) {
 
 // Template 2: Welcome Email
 function buildWelcomeEmail({ name }) {
-  const loginUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    logger.error('[email] FRONTEND_URL is not configured in environment variables for welcome email login link.');
+  }
+  const loginUrl = (frontendUrl || '').replace(/\/+$/, '');
   return {
     subject: 'Welcome to PentestRadar — Your account is ready!',
     html: `
       <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
         <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
           <div style="text-align:center;margin-bottom:28px">
-            <div style="width:64px;height:64px;background:#16e095;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:32px;margin-bottom:16px">B</div>
+            <div style="width:64px;height:64px;background:#16e095;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:32px;margin-bottom:16px">P</div>
             <h1 style="margin:0;font-size:26px;color:#ffffff">Welcome to PentestRadar!</h1>
           </div>
           <p style="margin:0 0 22px;color:#aeb8c7;line-height:1.6;font-size:16px">
@@ -211,7 +222,7 @@ function buildPasswordResetEmail({ email, resetUrl }) {
       <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
         <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
+            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">P</div>
             <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
           </div>
           <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">Reset Your Password</h1>
@@ -255,7 +266,7 @@ function buildInvoiceEmail({ invoiceNumber, planName, amount, date, downloadLink
       <div style="margin:0;background:#07111f;padding:32px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8fafc">
         <div style="max-width:620px;margin:0 auto;background:#0b1728;border:1px solid #20324a;border-radius:12px;padding:28px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">B</div>
+            <div style="width:36px;height:36px;background:#16e095;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#04120d;font-size:18px">P</div>
             <span style="font-size:20px;font-weight:900;color:#ffffff">PentestRadar</span>
           </div>
           <h1 style="margin:0 0 12px;font-size:24px;color:#ffffff">Payment Successful!</h1>

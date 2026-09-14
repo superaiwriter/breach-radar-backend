@@ -21,14 +21,22 @@ router.get('/google/callback',
 
       setTokensCookies(res, accessToken, refreshToken);
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL;
+      if (!frontendUrl) {
+        logger.error('[google-oauth] FRONTEND_URL is not configured in environment variables. Cannot redirect user safely.');
+      }
+      const baseUrl = (frontendUrl || '').replace(/\/+$/, '');
 
       // Redirect to frontend with token in URL (frontend will store it)
-      res.redirect(`${frontendUrl}/auth/google/success?token=${accessToken}`);
+      res.redirect(`${baseUrl}/auth/google/success?token=${accessToken}`);
     } catch (err) {
       logger.error(`[google-oauth] Callback error: ${err.message}`);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/login?error=google_failed`);
+      const frontendUrl = process.env.FRONTEND_URL;
+      if (!frontendUrl) {
+        logger.error('[google-oauth] FRONTEND_URL is not configured in environment variables. Cannot redirect user on error.');
+      }
+      const baseUrl = (frontendUrl || '').replace(/\/+$/, '');
+      res.redirect(`${baseUrl}/login?error=google_failed`);
     }
   }
 );

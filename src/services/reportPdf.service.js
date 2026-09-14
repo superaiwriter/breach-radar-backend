@@ -42,7 +42,7 @@ class ReportPdfService {
 
         addWatermark(doc);
 
-        const vulns = report.vulns || [0, 0, 0, 0];        const [critical, high, medium, low] = vulns;
+        const vulns = report.vulns || [0, 0, 0, 0]; const [critical, high, medium, low] = vulns;
         const totalFindings = vulns.reduce((sum, value) => sum + (Number(value) || 0), 0);
         const generatedLines = String(report.generated || '').split('\n');
         const generatedDate = generatedLines[0] || '-';
@@ -166,8 +166,8 @@ class ReportPdfService {
           .font('Helvetica')
           .text(
             `This report summarizes the latest ${report.scanType || 'security'} assessment for ${report.domain || 'the selected domain'}. ` +
-              `The current security score is ${score === null ? 'pending' : `${score}/100`} with ${totalFindings} total open findings across all severity levels. ` +
-              'Review the vulnerability details, risk analysis, and remediation steps included in this report to prioritize fixes.',
+            `The current security score is ${score === null ? 'pending' : `${score}/100`} with ${totalFindings} total open findings across all severity levels. ` +
+            'Review the vulnerability details, risk analysis, and remediation steps included in this report to prioritize fixes.',
             50,
             sectionY + 38,
             { width: 495, align: 'left', lineGap: 4 }

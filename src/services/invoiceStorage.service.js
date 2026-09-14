@@ -41,8 +41,12 @@ class InvoiceStorageService {
     try {
       fs.writeFileSync(filePath, pdfBuffer);
       
-      const baseUrl = process.env.BACKEND_URL || 'http://localhost:5000';
-      const pdfUrl = `${baseUrl}/uploads/invoices/${filename}`;
+      const backendUrl = process.env.BACKEND_URL;
+      if (!backendUrl) {
+        logger.error('[invoice-storage] BACKEND_URL is not configured in environment variables for stored PDF URLs.');
+      }
+      const safeBackendUrl = (backendUrl || '').replace(/\/+$/, '');
+      const pdfUrl = `${safeBackendUrl}/uploads/invoices/${filename}`;
       
       logger.info(`[invoice-storage] Saved invoice locally to: ${filePath}`);
       return {

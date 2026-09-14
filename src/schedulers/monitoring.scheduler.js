@@ -26,7 +26,11 @@ function startMonitoringScheduler() {
   }
 
   started = true;
+<<<<<<< HEAD
   logger.info('Starting PentestRadar monitoring scheduler');
+=======
+  logger.info('Starting Pentestradar monitoring scheduler');
+>>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
   cron.schedule(DAILY_SCAN_CRON, async () => {
     logger.info('Cron triggered: daily domain scans');

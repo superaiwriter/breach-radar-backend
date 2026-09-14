@@ -119,9 +119,79 @@ const sendTestNotification = async (req, res, next) => {
   }
 };
 
+const markAsRead = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const notification = await Notification.findByIdAndUpdate(
+      id,
+      { readAt: new Date() },
+      { new: true }
+    );
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found.' });
+    }
+    res.status(200).json({ success: true, notification });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const markAllAsRead = async (req, res, next) => {
+  try {
+    const orgId = req.user.preferences?.activeOrganizationId;
+    const userId = req.user._id;
+    const email = req.user.email ? req.user.email.toLowerCase() : '';
+
+    const orConditions = [{ userId }];
+    if (orgId) orConditions.push({ organizationId: orgId });
+    if (email) orConditions.push({ email });
+
+    await Notification.updateMany(
+      { $or: orConditions, readAt: null },
+      { $set: { readAt: new Date() } }
+    );
+
+    res.status(200).json({ success: true, message: 'All notifications marked as read.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteNotification = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await Notification.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: 'Notification deleted.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const clearAllNotifications = async (req, res, next) => {
+  try {
+    const orgId = req.user.preferences?.activeOrganizationId;
+    const userId = req.user._id;
+    const email = req.user.email ? req.user.email.toLowerCase() : '';
+
+    const orConditions = [{ userId }];
+    if (orgId) orConditions.push({ organizationId: orgId });
+    if (email) orConditions.push({ email });
+
+    await Notification.deleteMany({ $or: orConditions });
+
+    res.status(200).json({ success: true, message: 'All notifications cleared.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getNotifications,
   getSettings,
   updateSettings,
-  sendTestNotification
+  sendTestNotification,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  clearAllNotifications
 };

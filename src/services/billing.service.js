@@ -457,7 +457,12 @@ async function changePlanImmediate(user, organization, subscription, plan, billi
 
   // Send Invoice Email via Resend
   const { sendInvoiceEmail } = require('./email/resend.service');
-  const downloadLink = invoice.pdfUrl || `${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/invoices/${invoice.invoiceNumber}.pdf`;
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl && !invoice.pdfUrl) {
+    logger.error('[billing-service] BACKEND_URL is not configured in environment variables for invoice download link.');
+  }
+  const safeBackendUrl = (backendUrl || '').replace(/\/+$/, '');
+  const downloadLink = invoice.pdfUrl || `${safeBackendUrl}/uploads/invoices/${invoice.invoiceNumber}.pdf`;
   
   invoice.emailDeliveryAttempts += 1;
   try {
