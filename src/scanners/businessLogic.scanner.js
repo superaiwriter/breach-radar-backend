@@ -49,14 +49,10 @@ function makeRequest(urlString, method = 'GET', data = null, headers = {}) {
       let body = '';
       res.on('data', (chunk) => {
         body += chunk;
-<<<<<<< HEAD
-        if (body.length > 500000) req.destroy(); // Cap response body size
-=======
         if (body.length > 500000) {
           req.destroy();
           reject(new Error('Response body limit exceeded'));
         }
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
       });
       res.on('end', () => {
         resolve({
@@ -72,14 +68,10 @@ function makeRequest(urlString, method = 'GET', data = null, headers = {}) {
       reject(new Error('Request timed out'));
     });
 
-<<<<<<< HEAD
-    req.on('error', reject);
-=======
     req.on('error', (err) => {
       req.destroy();
       reject(err);
     });
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
     if (postData) {
       req.write(postData);

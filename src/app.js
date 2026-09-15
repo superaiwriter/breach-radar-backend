@@ -31,10 +31,7 @@ const integrationRoutes = require('./routes/integration.routes');
 const activityLogRoutes = require('./routes/activityLog.routes');
 const supportRoutes = require('./routes/support.routes');
 const statsRoutes = require('./routes/stats.routes');
-<<<<<<< HEAD
-=======
 const pricingRoutes = require('./routes/pricing.routes');
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 const testBusinessWorkflowRoutes = require('./routes/testBusinessWorkflow.routes');
 const testBolaWorkflowRoutes = require('./routes/testBolaWorkflow.routes');
 const testBflaWorkflowRoutes = require('./routes/testBflaWorkflow.routes');
@@ -74,16 +71,6 @@ const logger = require('./config/logger');
 
 const app = express();
 
-<<<<<<< HEAD
-const defaultCorsOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5180',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  'http://127.0.0.1:5180'
-];
-=======
 const defaultCorsOrigins = process.env.NODE_ENV === 'production'
   ? [
       'https://pentestradar.com',
@@ -101,7 +88,6 @@ const defaultCorsOrigins = process.env.NODE_ENV === 'production'
       'https://www.pentestradar.com',
       'https://breach-radar-frontend-539618567961.europe-west1.run.app'
     ];
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
 const corsOrigins = [
   ...defaultCorsOrigins,
@@ -191,11 +177,8 @@ app.use('/api/v1/activity-log', activityLogRoutes);
 app.use('/api/v1/support', supportRoutes);
 app.use('/api/v1/stats', statsRoutes);
 app.use('/api/stats', statsRoutes);
-<<<<<<< HEAD
-=======
 app.use('/api/v1/pricing', pricingRoutes);
 app.use('/api/pricing', pricingRoutes);
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 app.use('/api/v1/test-business-workflow', testBusinessWorkflowRoutes);
 app.use('/api/v1/test-bola', testBolaWorkflowRoutes);
 app.use('/api/v1/test-bfla', testBflaWorkflowRoutes);

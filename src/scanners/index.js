@@ -31,12 +31,7 @@ const { scanDirectoryListing } = require('./directoryListing.scanner');
 const { scanBackupFileExposure } = require('./backupFileExposure.scanner');
 const { scanGitRepositoryExposure } = require('./gitRepositoryExposure.scanner');
 const { scanDebugMode } = require('./debugMode.scanner');
-<<<<<<< HEAD
-
-
-=======
 const logger = require('../config/logger');
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
 const ADAPTERS = {
   ssl: scanSsl,
@@ -124,21 +119,11 @@ function resolveEnabledScanners(checks = {}) {
     enabled.push('csrf');
     enabled.push('openRedirect');
   }
-<<<<<<< HEAD
-  
-=======
-
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
   if (checks.ssrf || checks.owasp) {
     enabled.push('ssrf');
     enabled.push('hostHeaderInjection');
     enabled.push('httpRequestSmuggling');
   }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
   if (enabled.length === 0) {
     enabled.push('ssl', 'headers');
@@ -147,19 +132,10 @@ function resolveEnabledScanners(checks = {}) {
   return [...new Set(enabled)];
 }
 
-<<<<<<< HEAD
 // authContext (optional) is produced by authSession.service.js for
 // Authenticated Scan Mode: { cookieJar: 'name=value; ...', headers: { Authorization?: 'Bearer ...' } }
-// Existing adapters (ssl, headers, dns, auth, etc.) only declare one
-// parameter, so passing this through is a no-op for all of them today.
-// Future auth-aware scanners (e.g. an IDOR scanner) can read it as their 2nd arg.
-async function runScanners(domain, checks = {}, authContext = null, scanContext = null) {
-  const enabled = resolveEnabledScanners(checks);
-  const results = [];
-=======
 // FIX: 30 second timeout per scanner — prevents infinite hang
 const SCANNER_TIMEOUT_MS = 30000;
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
 function withTimeout(promise, scannerName) {
   return Promise.race([
@@ -186,10 +162,6 @@ async function runScanners(domain, checks = {}, authContext = null, scanContext 
     }
 
     try {
-<<<<<<< HEAD
-      const result = await adapter(domain, authContext, scanContext);
-      results.push(result);
-=======
       logger.info(`[scanner] Starting: ${scannerName} on ${domain}`);
 
       const result = await withTimeout(
@@ -201,7 +173,6 @@ async function runScanners(domain, checks = {}, authContext = null, scanContext 
       logger.info(`[scanner] Done: ${scannerName} — ${findingCount} finding(s)`);
 
       return result;
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
     } catch (error) {
       logger.warn(`[scanner] Failed: ${scannerName} — ${error.message}`);
       return {

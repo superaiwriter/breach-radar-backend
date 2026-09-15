@@ -679,19 +679,13 @@ router.post('/paypal/create-order', authenticateJWT, requireTeamRole(['OWNER']),
     const usdAmount = Number((amountInINR / 83).toFixed(2));
     logger.info(`[payment-routes-paypal] Converted amountINR=${amountInINR} to amountUSD=${usdAmount}`);
 
-<<<<<<< HEAD
     const origin = returnBaseUrl || req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5180';
-    const returnUrl = `${origin.split('?')[0]}?paypal-success=true`;
-    const cancelUrl = `${origin.split('?')[0]}?paypal-cancel=true`;
-=======
-    const origin = returnBaseUrl || req.headers.origin || process.env.FRONTEND_URL;
     if (!origin) {
       logger.error('[payment-routes-paypal] No origin, returnBaseUrl, or FRONTEND_URL configured for PayPal callback.');
     }
     const safeOrigin = (origin || '').replace(/\/+$/, '');
     const returnUrl = `${safeOrigin.split('?')[0]}?paypal-success=true`;
     const cancelUrl = `${safeOrigin.split('?')[0]}?paypal-cancel=true`;
->>>>>>> c6e6a65c73bbe1bac59ccd1bda686a7df18a830c
 
     // Create PayPal order via PayPal Service
     const paypalOrder = await paypalService.createOrder(usdAmount, 'USD', returnUrl, cancelUrl);
