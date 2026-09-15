@@ -5,7 +5,7 @@ const logger = require('./config/logger');
 // Run critical production validation warnings on server load
 if (process.env.NODE_ENV === 'production') {
   const missing = [];
-  
+
   if (!process.env.MONGODB_URI) {
     missing.push('MONGODB_URI');
   }
@@ -90,7 +90,7 @@ const initializeBackgroundServices = async () => {
     // 1. Establish Database Connection
     try {
       await connectDB();
-      
+
       // 1b. Seed database with initial configs and mock records
       const dbSeeder = require('./config/dbSeeder');
       await dbSeeder();
@@ -100,11 +100,11 @@ const initializeBackgroundServices = async () => {
         const Scan = require('./models/Scan');
         const Domain = require('./models/Domain');
         const { SCAN_STATUS } = require('./constants');
-        
+
         const stuckScans = await Scan.find({
           status: { $in: [SCAN_STATUS.QUEUED, SCAN_STATUS.IN_PROGRESS] }
         });
-        
+
         if (stuckScans.length > 0) {
           logger.info(`[startup] Found ${stuckScans.length} stuck scans in active state. Cleaning up...`);
           for (const scan of stuckScans) {
@@ -112,12 +112,12 @@ const initializeBackgroundServices = async () => {
             scan.completedAt = new Date();
             scan.errorDetail = 'Scan interrupted due to server restart.';
             await scan.save();
-            
+
             const domain = await Domain.findById(scan.domainId);
             if (domain) {
               domain.statusDetail = 'Scan failed: Interrupted by server restart.';
               if (domain.verificationStatus === 'verified') {
-                domain.status = 'Active'; 
+                domain.status = 'Active';
               }
               await domain.save();
             }
@@ -152,7 +152,7 @@ const initializeBackgroundServices = async () => {
 
     startMonitoringScheduler();
     startSubscriptionExpiryWorker();
-    
+
     logger.info('All background services initialization completed.');
   } catch (error) {
     logger.error(`Background services initialization failed: ${error.message}`);
