@@ -33,8 +33,8 @@ const createUserSession = async (userId, token, req) => {
 
 const register = async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
-    const result = await authService.registerUser({ email, password, name });
+    const { email, password, name, accountType } = req.body;
+    const result = await authService.registerUser({ email, password, name, accountType });
     setTokensCookies(res, result.accessToken, result.refreshToken, { rememberMe: true });
     await createUserSession(result.user.id, result.refreshToken, req);
     res.status(201).json({ message: 'Registration successful', user: result.user, accessToken: result.accessToken });

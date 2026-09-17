@@ -18,7 +18,7 @@ const verifyPassword = async (password, hash) => {
   return bcrypt.compare(password, hash);
 };
 
-const registerUser = async ({ email, password, name }) => {
+const registerUser = async ({ email, password, name, accountType }) => {
   if (!email || !password || !name) {
     const err = new Error('Email, password, and name are required.');
     err.statusCode = 400;
@@ -53,6 +53,7 @@ const registerUser = async ({ email, password, name }) => {
   const user = new User({
     email,
     passwordHash,
+    accountType: ['individual', 'cyber_security_expert', 'organization'].includes(accountType) ? accountType : 'individual',
     status: 'pending_verification',
     isEmailVerified: false,
     emailVerifyToken: verifyTokenHash,

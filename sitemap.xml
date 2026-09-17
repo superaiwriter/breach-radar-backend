@@ -80,6 +80,11 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
+   <url>
+    <loc>https://pentestradar.com/founder</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
   <url>
     <loc>https://pentestradar.com/awards-recognition</loc>
     <changefreq>monthly</changefreq>

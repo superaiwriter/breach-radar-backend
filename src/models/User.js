@@ -19,6 +19,11 @@ const UserSchema = new mongoose.Schema({
     enum: Object.values(USER_ROLES),
     default: USER_ROLES.USER
   },
+  accountType: {
+    type: String,
+    enum: ['individual', 'cyber_security_expert', 'organization'],
+    default: 'individual'
+  },
   status: {
     type: String,
     enum: ['active', 'suspended', 'pending_verification'],
