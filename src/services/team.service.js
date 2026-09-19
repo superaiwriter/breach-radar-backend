@@ -188,14 +188,14 @@ async function ensureOrganizationForUser(user) {
     }
 
     const SubscriptionPlan = require('../models/SubscriptionPlan');
-    const starterPlan = await SubscriptionPlan.findOne({ name: 'Starter' });
-    const starterSeatLimit = starterPlan ? starterPlan.seatLimit : 1;
+    const freePlan = await SubscriptionPlan.findOne({ name: 'Free' });
+    const freeSeatLimit = freePlan ? freePlan.seatLimit : 1;
 
     organization = await Organization.create({
       name: `${user.profile?.name || user.email}'s Organization`,
       ownerId: user._id,
-      subscriptionPlan: 'Starter',
-      maxSeats: starterSeatLimit,
+      subscriptionPlan: 'Free',
+      maxSeats: freeSeatLimit,
       timezone: user.preferences?.timezone || 'UTC',
     });
   }

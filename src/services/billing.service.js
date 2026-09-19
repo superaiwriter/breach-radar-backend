@@ -17,7 +17,7 @@ const {
   logRazorpayError
 } = require('../config/razorpay');
 
-const PLAN_ORDER = ['Starter', 'Professional', 'Business', 'Enterprise'];
+const PLAN_ORDER = ['Free', 'Starter', 'Professional', 'Business', 'Enterprise'];
 
 function addMonths(date, count) {
   const next = new Date(date);
@@ -97,7 +97,7 @@ async function ensureSubscription(user, organization) {
     subscription = await Subscription.create({
       userId: organization.ownerId || user._id,
       organizationId: organization._id,
-      currentPlan: organization.subscriptionPlan || 'Starter',
+      currentPlan: organization.subscriptionPlan || 'Free',
       billingCycle: 'monthly',
       startDate: new Date(),
       nextBillingDate: addMonths(new Date(), 1),
@@ -108,7 +108,7 @@ async function ensureSubscription(user, organization) {
     await auditService.logAudit({
       userId: organization.ownerId || user._id,
       action: 'Plan Created',
-      description: `Starter plan subscription created automatically.`,
+      description: `${organization.subscriptionPlan || 'Free'} plan subscription created automatically.`,
       status: 'Success'
     });
   }

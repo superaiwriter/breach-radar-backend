@@ -16,9 +16,9 @@ const SubscriptionSchema = new mongoose.Schema({
   },
   currentPlan: {
     type: String,
-    enum: ['Starter', 'Professional', 'Business', 'Enterprise'],
+    enum: ['Free', 'Starter', 'Professional', 'Business', 'Enterprise'],
     required: true,
-    default: 'Starter',
+    default: 'Free',
     index: true,
   },
   billingCycle: {

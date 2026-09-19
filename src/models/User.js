@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
     organization: { type: String, default: '' },
     jobTitle: { type: String, default: '' },
     country: { type: String, default: '' },
-    plan: { type: String, default: 'Starter' }
+    plan: { type: String, default: 'Free' }
   },
   preferences: {
     language: { type: String, default: 'en' },

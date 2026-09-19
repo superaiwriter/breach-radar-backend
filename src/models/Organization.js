@@ -14,8 +14,8 @@ const OrganizationSchema = new mongoose.Schema({
   },
   subscriptionPlan: {
     type: String,
-    enum: ['Starter', 'Professional', 'Business', 'Enterprise'],
-    default: 'Starter'
+    enum: ['Free', 'Starter', 'Professional', 'Business', 'Enterprise'],
+    default: 'Free'
   },
   maxSeats: {
     type: Number,
