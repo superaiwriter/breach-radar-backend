@@ -145,12 +145,31 @@ const loginUser = async ({ email, password, rememberMe = true }) => {
     throw err;
   }
 
-  const user = await User.findOne({ email });
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const dbStart = Date.now();
+  logger.info(`[auth-service] [STEP 2a] Database lookup started (User.findOne) for email=${normalizedEmail}`);
+
+  let user;
+  try {
+    user = await User.findOne({ email: normalizedEmail });
+  } catch (dbErr) {
+    const dbDuration = Date.now() - dbStart;
+    logger.error(`[auth-service] [ERROR] Database lookup failed after ${dbDuration}ms for email=${normalizedEmail}: ${dbErr.message}`);
+    const err = new Error('Database connection timed out or is currently unavailable.');
+    err.statusCode = 503;
+    err.originalError = dbErr;
+    throw err;
+  }
+
+  const dbDuration = Date.now() - dbStart;
   if (!user) {
+    logger.info(`[auth-service] [STEP 2b] Database lookup completed - USER NOT FOUND for email=${normalizedEmail} (${dbDuration}ms)`);
     const err = new Error('Invalid email or password.');
     err.statusCode = 401;
     throw err;
   }
+
+  logger.info(`[auth-service] [STEP 2b] Database lookup completed - USER FOUND (ID: ${user._id}, status: ${user.status}) (${dbDuration}ms)`);
 
   if (user.status === 'suspended') {
     const err = new Error('Your account has been suspended.');
@@ -168,7 +187,12 @@ const loginUser = async ({ email, password, rememberMe = true }) => {
     throw err;
   }
 
+  const pwStart = Date.now();
+  logger.info(`[auth-service] [STEP 3a] Password comparison started for email=${normalizedEmail}`);
   const isMatch = await verifyPassword(password, user.passwordHash);
+  const pwDuration = Date.now() - pwStart;
+  logger.info(`[auth-service] [STEP 3b] Password comparison completed - Match: ${isMatch} (${pwDuration}ms)`);
+
   if (!isMatch) {
     const err = new Error('Invalid email or password.');
     err.statusCode = 401;
@@ -182,14 +206,24 @@ const loginUser = async ({ email, password, rememberMe = true }) => {
   }
 
   user.lastLogin = new Date();
-  await user.save();
-  await teamService.recordLogin(user);
+  try {
+    await user.save();
+  } catch (saveErr) {
+    logger.warn(`[auth-service] Non-critical user lastLogin save failed: ${saveErr.message}`);
+  }
 
-  const activeWorkspaceId = user.preferences.activeWorkspaceId;
+  // Non-blocking team activity recording
+  teamService.recordLogin(user).catch((recordErr) => {
+    logger.warn(`[auth-service] Non-blocking team recordLogin failed: ${recordErr.message}`);
+  });
+
+  const jwtStart = Date.now();
+  logger.info(`[auth-service] [STEP 4a] JWT generation started for email=${normalizedEmail}`);
+  const activeWorkspaceId = user.preferences?.activeWorkspaceId;
   const accessToken = generateAccessToken(user, activeWorkspaceId);
   const refreshToken = generateRefreshToken(user, { rememberMe });
-
-  logger.info(`User logged in: ${email}`);
+  const jwtDuration = Date.now() - jwtStart;
+  logger.info(`[auth-service] [STEP 4b] JWT generation completed for email=${normalizedEmail} (${jwtDuration}ms)`);
 
   return {
     user: {
@@ -207,6 +241,7 @@ const loginUser = async ({ email, password, rememberMe = true }) => {
     rememberMe: Boolean(rememberMe),
   };
 };
+
 
 const loginAdmin = async ({ email, password }) => {
   if (!email || !password) {

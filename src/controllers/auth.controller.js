@@ -44,17 +44,39 @@ const register = async (req, res, next) => {
 };
 
 const login = async (req, res, next) => {
+  const startTime = Date.now();
+  const safeEmail = req.body?.email ? String(req.body.email).toLowerCase().trim() : 'undefined';
+
   try {
     const { email, password, rememberMe } = req.body;
+    logger.info(`[auth-controller] [STEP 1] Login request received for email=${safeEmail}`);
+
     const persistentSession = resolveRememberMe(rememberMe);
     const result = await authService.loginUser({ email, password, rememberMe: persistentSession });
+
     setTokensCookies(res, result.accessToken, result.refreshToken, { rememberMe: persistentSession });
-    await createUserSession(result.user.id, result.refreshToken, req);
-    res.status(200).json({ message: 'Login successful', user: result.user, accessToken: result.accessToken });
+
+    // Non-blocking session creation & audit logging so metadata logging never delays or hangs the HTTP response
+    createUserSession(result.user.id, result.refreshToken, req).catch((sessionErr) => {
+      logger.error(`[auth-controller] Non-blocking user session creation failed: ${sessionErr.message}`);
+    });
+
+    const durationMs = Date.now() - startTime;
+    logger.info(`[auth-controller] [STEP 5] Login response sent successfully for email=${safeEmail} (Total duration: ${durationMs}ms)`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      user: result.user,
+      accessToken: result.accessToken
+    });
   } catch (error) {
+    const durationMs = Date.now() - startTime;
+    logger.error(`[auth-controller] [ERROR] Login failed for email=${safeEmail} after ${durationMs}ms: ${error.message}`);
     next(error);
   }
 };
+
 
 const adminLogin = async (req, res, next) => {
   try {
