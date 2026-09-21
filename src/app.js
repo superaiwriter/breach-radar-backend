@@ -128,16 +128,25 @@ app.use(cors({
 }));
 
 // DATABASE CONNECTION READINESS CHECK (Prevents requests from hanging on disconnected database)
-app.use('/api', (req, res, next) => {
+const { ensureDBConnected } = require('./config/db');
+
+app.use('/api', async (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
-    logger.error(`[database] API request ${req.method} ${req.originalUrl} failed: MongoDB is not connected (readyState=${mongoose.connection.readyState})`);
-    return res.status(503).json({
-      success: false,
-      message: 'Database connection is currently unavailable. Please try again in a few moments.'
-    });
+    try {
+      await ensureDBConnected();
+    } catch (connErr) {
+      logger.error(`[database] API request ${req.method} ${req.originalUrl} failed: MongoDB is not connected (readyState=${mongoose.connection.readyState}) - Error: ${connErr.message}`);
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection is currently unavailable. Please try again in a few moments.',
+        error: connErr.name || 'MongoConnectionError',
+        detail: connErr.message
+      });
+    }
   }
   next();
 });
+
 
 // Cookie Parser Middleware
 app.use(cookieParser());
@@ -230,20 +239,27 @@ app.use('/api/test-debug-mode', testDebugModeRoutes);
 // Enhanced Database Diagnostic & Health Check Endpoint
 app.get(['/health', '/api/v1/health/db'], async (req, res) => {
   const readyStateMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
-  const currentState = readyStateMap[mongoose.connection.readyState] || 'unknown';
   const hasMongoUri = Boolean(process.env.MONGODB_URI);
 
   if (mongoose.connection.readyState !== 1) {
-    logger.warn(`[health-check] DB Health check failed: Mongoose state is '${currentState}'`);
-    return res.status(503).json({
-      status: 'UNHEALTHY',
-      mongooseState: currentState,
-      hasMongoUriEnv: hasMongoUri,
-      error: 'MongoDB is not connected',
-      timestamp: new Date()
-    });
+    logger.warn(`[health-check] DB is in '${readyStateMap[mongoose.connection.readyState] || 'unknown'}' state. Attempting automatic reconnection...`);
+    try {
+      await ensureDBConnected();
+    } catch (connErr) {
+      const currentState = readyStateMap[mongoose.connection.readyState] || 'unknown';
+      logger.error(`[health-check] Reconnection attempt failed: ${connErr.name} - ${connErr.message}`);
+      return res.status(503).json({
+        status: 'UNHEALTHY',
+        mongooseState: currentState,
+        hasMongoUriEnv: hasMongoUri,
+        error: connErr.name || 'MongoConnectionError',
+        message: connErr.message || 'MongoDB connection failed',
+        timestamp: new Date()
+      });
+    }
   }
 
+  const currentState = readyStateMap[mongoose.connection.readyState] || 'connected';
   const pingStart = Date.now();
   try {
     // 1. Admin ping command to verify TCP / Wire Protocol latency
@@ -277,12 +293,13 @@ app.get(['/health', '/api/v1/health/db'], async (req, res) => {
       mongooseState: currentState,
       hasMongoUriEnv: hasMongoUri,
       error: err.name || 'MongoError',
-      message: 'Database query timed out or failed to execute',
+      message: err.message || 'Database query timed out or failed to execute',
       totalMs,
       timestamp: new Date()
     });
   }
 });
+
 
 
 // Capture Unknown Paths
